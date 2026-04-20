@@ -1,6 +1,6 @@
 <?php
 
-$url = "http://parallel.test/api/orders";
+$url = "http://127.0.0.1:8000/api/orders";
 
 $mh = curl_multi_init();
 $handles = [];
