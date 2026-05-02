@@ -16,7 +16,7 @@ class OrderService
     public function createOrder($items) {
         return DB::transaction(function() use ($items) {
             $order = Order::create([
-                'user_id' => 1,
+                'user_id' => rand(1,2),
                 'total' => 0
             ]);
 
