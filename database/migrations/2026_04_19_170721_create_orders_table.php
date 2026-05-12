@@ -15,6 +15,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id');
             $table->decimal('total', 10, 2)->default(0);
+            $table->integer('stock')->default(0);
+            $table->string('name')->nullable();
+
             $table->timestamps();
         });
     }
