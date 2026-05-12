@@ -17,5 +17,6 @@ Route::get('/invoice-without', [OrderController::class, 'createOrderWithInvoiceS
 Route::get('/invoice-with', [OrderController::class, 'createOrderWithInvoiceAsync']);
 
 Route::get('/daily-sales-batch', [OrderController::class, 'dailySalesBatch']);
+
 Route::get('/before', [OrderController::class, 'before']);
 Route::get('/after', [OrderController::class, 'after']);

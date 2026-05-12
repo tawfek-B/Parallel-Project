@@ -34,7 +34,8 @@ class OrderService
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $product->id,
-                    'quantity' => $item['quantity']
+                    'quantity' => $item['quantity'],
+                    'price'=>$product->price
                 ]);
 
                 $total += $product->price * $item['quantity'];

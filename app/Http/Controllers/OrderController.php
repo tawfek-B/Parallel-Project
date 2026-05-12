@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
 use App\Jobs\ProcessOrderJob;
 use Illuminate\Http\Request;
 use App\Jobs\GenerateInvoiceJob;
 use App\Services\OrderService;
 use Illuminate\Support\Facades\Log;
-use App\Models\OrderItem;
-use App\Models\Product;
+
 
 
 class OrderController extends Controller
