@@ -9,7 +9,7 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::post('orders', [\App\Http\Controllers\OrderController::class, 'store']);
+Route::post('orders', [OrderController::class, 'store']);
 
 // العمل بالخلفية للمهام الغير اساسية
 
@@ -18,5 +18,6 @@ Route::get('/invoice-with', [OrderController::class, 'createOrderWithInvoiceAsyn
 
 Route::get('/daily-sales-batch', [OrderController::class, 'dailySalesBatch']);
 
-Route::get('/before', [OrderController::class, 'before']);
-Route::get('/after', [OrderController::class, 'after']);
+Route::get('/product/{id}', [\App\Http\Controllers\ProductController::class, 'fetch']);
+
+Route::get('/load-balancer', [OrderController::class, 'simulateLoad']);

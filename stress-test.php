@@ -5,7 +5,7 @@ $url = "http://127.0.0.1:8000/api/orders";
 $mh = curl_multi_init();
 $handles = [];
 
-$users = 100;
+$users = 200;
 
 for ($i = 0; $i < $users; $i++) {
     $ch = curl_init();

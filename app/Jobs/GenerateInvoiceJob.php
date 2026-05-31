@@ -18,7 +18,7 @@ class GenerateInvoiceJob implements ShouldQueue
     public function handle(): void
     {
 
-        sleep(10);
+        usleep(500000); //0.5 seconds
 
         Log::info("Invoice generated for Order ID: " . $this->orderId);
     }

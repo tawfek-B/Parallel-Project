@@ -17,15 +17,14 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
-
-        User::factory()->create([
-            'name' => 'Test User 2',
-            'email' => 'test2@example.com',
-        ]);
+        for ($i = 0; $i < 10; $i++) {
+            User::factory()->create(
+                [
+                    'name' => 'Test User ' . $i,
+                    'email' => 'test' . $i . '@example.com',
+                ]
+            );
+        }
 
         \App\Models\Product::factory(10)->create();
     }

@@ -5,120 +5,145 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Jobs\ProcessOrderJob;
+use App\Models\User;
+use App\Services\LoadBalancerService;
 use Illuminate\Http\Request;
 use App\Jobs\GenerateInvoiceJob;
 use App\Services\OrderService;
 use Illuminate\Support\Facades\Log;
-
+use Illuminate\Support\Facades\RateLimiter;
 
 
 class OrderController extends Controller
 {
     public function store(Request $request)
     {
-        ProcessOrderJob::dispatch(
-            auth()->id() ?? 1,
+        $userId = User::find(rand(1, User::max('id')))->id;
+
+        $executed = RateLimiter::attempt(
+            'orders:' . $userId,
+            10,
+            function () use ($userId, $request) {
+
+                ProcessOrderJob::dispatch(
+                    $userId,
+                    $request->items ?? [
+                        ['product_id' => 1, 'quantity' => 1],
+                        ['product_id' => 2, 'quantity' => 1],
+                    ]
+                );
+            }
+        );
+
+        if (!$executed) {
+            Log::info("Rate limit exceeded for user: $userId");
+        }
+
+        Log::info("Order request received for user: $userId");
+    }
+    // اصدار فاتورة بدون مزامنة
+    public function createOrderWithInvoiceSync(Request $request)
+    {
+        $service = app(OrderService::class);
+
+        $start = microtime(true);
+
+        $order = $service->createOrder(
+            User::find(rand(1, User::max('id')))->id,
             $request->items ?? [
                 ['product_id' => 1, 'quantity' => 1],
                 ['product_id' => 2, 'quantity' => 1],
             ]
         );
 
+        usleep(200000); //0.2 seconds
+
+        $time = microtime(true) - $start;
+
         return response()->json([
-            'message' => 'Order queued successfully',
+            'message' => 'Order created, thank you for waiting while we generate your invoice',
+            'order_id' => $order->id,
+
         ]);
     }
-    // اصدار فاتورة بدون مزامنة
-public function createOrderWithInvoiceSync(Request $request)
-{
-    $service = app(OrderService::class);
+    // اصدار الفاتورة مع مزامنة
+    public function createOrderWithInvoiceAsync(Request $request)
+    {
+        $service = app(OrderService::class);
 
-    $start = microtime(true);
+        $start = microtime(true);
 
-    $order = $service->createOrder(
-        $request->items ?? [
-            ['product_id' => 1, 'quantity' => 1],
-            ['product_id' => 2, 'quantity' => 1],
-        ]
-    );
+        $order = $service->createOrder(
+            User::find(rand(1, User::max('id')))->id,
+            $request->items ?? [
+                ['product_id' => 1, 'quantity' => 1],
+                ['product_id' => 2, 'quantity' => 1],
+            ]
+        );
 
-    sleep(10);
+        // إصدار الفاتورة بالخلفية
+        GenerateInvoiceJob::dispatch($order->id);
 
-    $time = microtime(true) - $start;
+        $time = microtime(true) - $start;
 
-    return response()->json([
-        'message' => 'Order created, thank you for waiting while we generate your invoice',
-        'order_id' => $order->id,
+        return response()->json([
+            'message' => 'your order created',
+            'order_id' => $order->id,
 
-    ]);
-}
-// اصدار الفاتورة مع مزامنة
-public function createOrderWithInvoiceAsync(Request $request)
-{
-    $service = app(OrderService::class);
+        ]);
+    }
+    // الحل الفعلي
+    public function dailySalesBatch()
+    {
+        $start = microtime(true);
 
-    $start = microtime(true);
+        $sales = [];
 
-    $order = $service->createOrder(
-        $request->items ?? [
-            ['product_id' => 1, 'quantity' => 1],
-            ['product_id' => 2, 'quantity' => 1],
-        ]
-    );
+        $products = Product::all()->keyBy('id');
 
-    // إصدار الفاتورة بالخلفية
-    GenerateInvoiceJob::dispatch($order->id);
+        OrderItem::chunk(100, function ($items) use (&$sales, $products) {
+            foreach ($items as $item) {
 
-    $time = microtime(true) - $start;
+                $product = $products[$item->product_id] ?? null;
+                if (!$product)
+                    continue;
 
-    return response()->json([
-        'message' => 'your order created',
-        'order_id' => $order->id,
+                if (!isset($sales[$item->product_id])) {
+                    $sales[$item->product_id] = [
+                        'product_name' => $product->name,
+                        'total_quantity' => 0,
+                        'total_revenue' => 0,
+                    ];
+                }
 
-    ]);
-}
-// الحل الفعلي
-public function dailySalesBatch()
-{
-    $start = microtime(true);
-
-    $sales = [];
-
-    OrderItem::chunk(2, function ($items) use (&$sales) {
-
-        foreach ($items as $item) {
-
-            // إذا المنتج مو موجود بالمصفوفة
-            if (!isset($sales[$item->product_id])) {
-                $product = Product::find($item->product_id);
-
-                $sales[$item->product_id] = [
-                    'product_name' => $product->name,
-                    'total_quantity' => 0,
-                    'total_revenue' => 0,
-                ];
+                $sales[$item->product_id]['total_quantity'] += $item->quantity;
+                $sales[$item->product_id]['total_revenue'] += $item->quantity * $item->price;
             }
+        });
 
-            // جمع الكميات
-            $sales[$item->product_id]['total_quantity']
-                += $item->quantity;
+        $time = microtime(true) - $start;
 
-            // جمع الإيرادات
-            $sales[$item->product_id]['total_revenue']
-                += $item->quantity * $item->price;
+        return response()->json([
+            'message' => 'Daily sales processed in batches',
+            'execution_time' => round($time, 2) . ' sec',
+            'sales_summary' => array_values($sales),
+        ]);
+    }
+
+    public function simulateLoad()
+    {
+        $result = [];
+
+        for ($i = 1; $i <= 100; $i++) {
+
+            $server = app(LoadBalancerService::class)
+                ->distribute($i);
+
+            $result[$server] =
+                ($result[$server] ?? 0) + 1;
         }
 
-    });
-    $time = microtime(true) - $start;
+        return $result;
+    }
 
-    return response()->json([
-        'message' => 'Daily sales processed in batches',
-        'execution_time' => round($time, 2) . ' sec',
-        'sales_summary' => array_values($sales),
-    ]);
 }
-}
-
-
-
-

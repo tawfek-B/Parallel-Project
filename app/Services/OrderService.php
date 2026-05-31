@@ -13,41 +13,44 @@ class OrderService
      * Create a new class instance.
      */
 
-    public function createOrder($items) {
-        return DB::transaction(function() use ($items) {
-            $order = Order::create([
-                'user_id' => rand(1,2),
-                'total' => 0
-            ]);
+     public function createOrder($userId, $items)
+     {
+         return DB::transaction(function () use ($userId, $items) {
 
-            $total = 0;
+             $order = Order::create([
+                 'user_id' => $userId,
+                 'total' => 0
+             ]);
 
-            foreach ($items as $item) {
-                $product = Product::where('id', $item['product_id'])->lockForUpdate()->first();
+             $total = 0;
 
-                if ($product->stock < $item['quantity']) {
-                    throw new \Exception("Not enough stock for product: " . $product->name);
-                }
+             foreach ($items as $item) {
+                 $product = Product::where('id', $item['product_id'])
+                     ->lockForUpdate()
+                     ->first();
 
-                $product->decrement('stock', $item['quantity']);
+                 if ($product->stock < $item['quantity']) {
+                     throw new \Exception("Not enough stock for product: " . $product->name);
+                 }
 
-                OrderItem::create([
-                    'order_id' => $order->id,
-                    'product_id' => $product->id,
-                    'quantity' => $item['quantity'],
-                    'price'=>$product->price
-                ]);
+                 $product->decrement('stock', $item['quantity']);
 
-                $total += $product->price * $item['quantity'];
-            }
+                 OrderItem::create([
+                     'order_id' => $order->id,
+                     'product_id' => $product->id,
+                     'quantity' => $item['quantity'],
+                     'price' => $product->price
+                 ]);
 
-            $order->total = $total;
-            $order->save();
+                 $total += $product->price * $item['quantity'];
+             }
 
-            return $order;
-        });
+             $order->update(['total' => $total]);
 
-    }
+             return $order;
+         });
+     }
+
     public function __construct()
     {
         //
