@@ -1,13 +1,13 @@
 <?php
 
-$url = "http://127.0.0.1:8000/api/orders";
+$url = "http://parallel.test/api/orders";
 
+$start = microtime(true);
 $mh = curl_multi_init();
 $handles = [];
 
-$users = 200;
+for ($i = 0; $i < 100; $i++) {
 
-for ($i = 0; $i < $users; $i++) {
     $ch = curl_init();
 
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -15,7 +15,7 @@ for ($i = 0; $i < $users; $i++) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Accept: application/json"
+        "Content-Type: application/json"
     ]);
 
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
@@ -25,26 +25,18 @@ for ($i = 0; $i < $users; $i++) {
         ]
     ]));
 
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Content-Type: application/json"
-    ]);
-
     curl_multi_add_handle($mh, $ch);
+
     $handles[] = $ch;
 }
 
-// execute all requests in parallel
 $running = null;
+
 do {
     curl_multi_exec($mh, $running);
     curl_multi_select($mh);
 } while ($running > 0);
 
-// cleanup
-foreach ($handles as $ch) {
-    curl_multi_remove_handle($mh, $ch);
-}
+$time = microtime(true) - $start;
 
-curl_multi_close($mh);
-
-echo "Done sending 100 concurrent requests\n";
+echo "Done in {$time} seconds\n";

@@ -20,4 +20,6 @@ Route::get('/daily-sales-batch', [OrderController::class, 'dailySalesBatch']);
 
 Route::get('/product/{id}', [\App\Http\Controllers\ProductController::class, 'fetch']);
 
+Route::get('/products', [\App\Http\Controllers\ProductController::class, 'fetchAll']);
+
 Route::get('/load-balancer', [OrderController::class, 'simulateLoad']);

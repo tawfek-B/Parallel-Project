@@ -21,4 +21,17 @@ class ProductController extends Controller
             'execution_time_ms' => round($time, 2)
         ]);
     }
+
+    public function fetchAll(ProductService $service) {
+        $start = microtime(true);
+
+        $products = $service->getProducts();
+
+        $time = (microtime(true) - $start) * 1000;
+
+        return response()->json([
+            'products' => $products,
+            'execution_time_ms' => round($time, 2)
+        ]);
+    }
 }

@@ -16,12 +16,37 @@ use Illuminate\Support\Facades\RateLimiter;
 
 class OrderController extends Controller
 {
+    //old version
+    // public function store(Request $request) {
+    //     $userId = User::find(rand(1, User::max('id')))->id;
+
+    //     $executed = RateLimiter::attempt(
+    //         'orders:' . $userId,
+    //         10,
+    //         function () use ($userId, $request) {
+
+    //             ProcessOrderJob::dispatch(
+    //                 $userId,
+    //                 $request->items ?? [
+    //                     ['product_id' => 1, 'quantity' => 1],
+    //                     ['product_id' => 2, 'quantity' => 1],
+    //                 ]
+    //             );
+    //         }
+    //     );
+    //     if (!$executed) {
+    //         Log::info("Rate limit exceeded for user: $userId");
+    //     }
+
+    //     Log::info("Order request received for user: $userId");
+    // }
+
     public function store(Request $request)
     {
-        $userId = User::find(rand(1, User::max('id')))->id;
+        $userId = User::inRandomOrder()->value('id');
 
         $executed = RateLimiter::attempt(
-            'orders:' . $userId,
+            "orders:$userId",
             10,
             function () use ($userId, $request) {
 
@@ -32,15 +57,24 @@ class OrderController extends Controller
                         ['product_id' => 2, 'quantity' => 1],
                     ]
                 );
-            }
+            },
+            60
         );
 
         if (!$executed) {
-            Log::info("Rate limit exceeded for user: $userId");
+            Log::warning("Rate limit exceeded for user: $userId");
+             return response()->json([
+                'message' => 'Too many orders, please try again later.'
+            ], 429);
         }
 
         Log::info("Order request received for user: $userId");
+
+        return response()->json([
+            'message' => 'Order queued'
+        ]);
     }
+
     // اصدار فاتورة بدون مزامنة
     public function createOrderWithInvoiceSync(Request $request)
     {
