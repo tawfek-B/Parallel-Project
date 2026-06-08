@@ -28,6 +28,8 @@ class OrderService
 
             foreach ($items as $item) {
 
+                // Acquire a distributed lock before entering
+                // the critical section that modifies stock.
                 $lock = Cache::lock(
                     'product-stock-' . $item['product_id'],
                     10
@@ -41,9 +43,10 @@ class OrderService
                         'product' => $item['product_id']
                     ]);
 
-                    $product = Product::findOrFail(
+                    $product = Product::where(
+                        'id',
                         $item['product_id']
-                    );
+                    )->firstOrFail();
 
                     if ($product->stock < $item['quantity']) {
                         throw new \Exception(
@@ -51,6 +54,7 @@ class OrderService
                         );
                     }
 
+                    // Only one worker may modify this product's stock.
                     $product->decrement(
                         'stock',
                         $item['quantity']
@@ -72,6 +76,7 @@ class OrderService
 
                 } finally {
 
+                    // Release lock to allow other workers to proceed.
                     optional($lock)->release();
 
                     Log::info('LOCK RELEASED', [

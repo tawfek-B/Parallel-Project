@@ -6,6 +6,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Facades\Log;
+use App\Jobs\Middleware\LogJobExecution;
+use App\Jobs\Middleware\MeasureJobPerformance;
 
 class GenerateInvoiceJob implements ShouldQueue
 {
@@ -22,4 +24,12 @@ class GenerateInvoiceJob implements ShouldQueue
 
         Log::info("Invoice generated for Order ID: " . $this->orderId);
     }
+
+    public function middleware()
+{
+    return [
+        new LogJobExecution(),
+        new MeasureJobPerformance(),
+    ];
+}
 }

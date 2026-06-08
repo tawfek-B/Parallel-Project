@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use App\Jobs\ProcessDailySalesJob;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -53,8 +54,8 @@ class OrderController extends Controller
                 ProcessOrderJob::dispatch(
                     $userId,
                     $request->items ?? [
-                        ['product_id' => 1, 'quantity' => 1],
-                        ['product_id' => 2, 'quantity' => 1],
+                        ['product_id' => Product::inRandomOrder()->value('id'), 'quantity' => rand(1, 3)],
+                        ['product_id' => Product::inRandomOrder()->value('id'), 'quantity' => rand(1, 3)],
                     ]
                 );
             },
@@ -63,7 +64,7 @@ class OrderController extends Controller
 
         if (!$executed) {
             Log::warning("Rate limit exceeded for user: $userId");
-             return response()->json([
+            return response()->json([
                 'message' => 'Too many orders, please try again later.'
             ], 429);
         }
@@ -85,18 +86,19 @@ class OrderController extends Controller
         $order = $service->createOrder(
             User::find(rand(1, User::max('id')))->id,
             $request->items ?? [
-                ['product_id' => 1, 'quantity' => 1],
-                ['product_id' => 2, 'quantity' => 1],
+                ['product_id' => Product::inRandomOrder()->value('id'), 'quantity' => rand(1, 3)],
+                ['product_id' => Product::inRandomOrder()->value('id'), 'quantity' => rand(1, 3)],
             ]
         );
 
-        usleep(200000); //0.2 seconds
+        // usleep(200000); //0.2 seconds
 
         $time = microtime(true) - $start;
 
         return response()->json([
             'message' => 'Order created, thank you for waiting while we generate your invoice',
             'order_id' => $order->id,
+            'execution_time_seconds' => round($time, 2)
 
         ]);
     }
@@ -110,8 +112,8 @@ class OrderController extends Controller
         $order = $service->createOrder(
             User::find(rand(1, User::max('id')))->id,
             $request->items ?? [
-                ['product_id' => 1, 'quantity' => 1],
-                ['product_id' => 2, 'quantity' => 1],
+                ['product_id' => Product::inRandomOrder()->value('id'), 'quantity' => rand(1, 3)],
+                ['product_id' => Product::inRandomOrder()->value('id'), 'quantity' => rand(1, 3)],
             ]
         );
 
@@ -121,8 +123,9 @@ class OrderController extends Controller
         $time = microtime(true) - $start;
 
         return response()->json([
-            'message' => 'your order created',
+            'message' => 'Your order has been placed successfully, and your invoice is being generated. Thank you for your patience!',
             'order_id' => $order->id,
+            'execution_time_seconds' => round($time, 2)
 
         ]);
     }
@@ -131,37 +134,36 @@ class OrderController extends Controller
     {
         $start = microtime(true);
 
-        $sales = [];
-
-        $products = Product::all()->keyBy('id');
-
-        OrderItem::chunk(100, function ($items) use (&$sales, $products) {
-            foreach ($items as $item) {
-
-                $product = $products[$item->product_id] ?? null;
-                if (!$product)
-                    continue;
-
-                if (!isset($sales[$item->product_id])) {
-                    $sales[$item->product_id] = [
-                        'product_name' => $product->name,
-                        'total_quantity' => 0,
-                        'total_revenue' => 0,
-                    ];
-                }
-
-                $sales[$item->product_id]['total_quantity'] += $item->quantity;
-                $sales[$item->product_id]['total_revenue'] += $item->quantity * $item->price;
-            }
-        });
+        ProcessDailySalesJob::dispatch();
 
         $time = microtime(true) - $start;
 
         return response()->json([
-            'message' => 'Daily sales processed in batches',
-            'execution_time' => round($time, 2) . ' sec',
-            'sales_summary' => array_values($sales),
+            'message' => 'Daily sales processing queued',
+            'execution_time_seconds' => $time
         ]);
+    }
+
+    public function dailySalesBruteForce()
+    {
+        $start = microtime(true);
+
+        $orders = Order::with('items')->get();
+
+        foreach ($orders as $order) {
+            foreach ($order->items as $item) {
+                $sales[$item->product_id] = ($sales[$item->product_id] ?? 0) + ($item->quantity * $item->price);
+            }
+        }
+
+        $time = microtime(true) - $start;
+
+        return response()->json([
+            'message' => 'Daily sales summary',
+            'sales' => $sales,
+            'execution_time_seconds' => $time
+        ]);
+
     }
 
     public function simulateLoad()

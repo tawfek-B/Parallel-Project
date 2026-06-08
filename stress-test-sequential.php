@@ -11,8 +11,6 @@ use App\Models\Product;
 $url = "http://parallel.test/api/orders";
 
 $start = microtime(true);
-$mh = curl_multi_init();
-$handles = [];
 
 $requests = 100;
 
@@ -20,6 +18,7 @@ $success = 0;
 $rateLimited = 0;
 $failed = 0;
 $errors = 0;
+
 
 for ($i = 0; $i < $requests; $i++) {
 
@@ -40,24 +39,9 @@ for ($i = 0; $i < $requests; $i++) {
         ]
     ]));
 
-    curl_multi_add_handle($mh, $ch);
-
-    $handles[] = $ch;
-}
-
-$running = null;
-
-do {
-    curl_multi_exec($mh, $running);
-    curl_multi_select($mh);
-} while ($running > 0);
-
-foreach ($handles as $index => $ch) {
-
-    $response = curl_multi_getcontent($ch);
+    $response = curl_exec($ch);
 
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
     $curlError = curl_error($ch);
 
     if (!empty($curlError)) {
@@ -66,26 +50,27 @@ foreach ($handles as $index => $ch) {
         curl_multi_remove_handle($mh, $ch);
     } elseif ($httpCode >= 200 && $httpCode < 300) {
         $success++;
-        echo "Success (HTTP Code: $httpCode): " . $response . "\n";
+        echo "Success (HTTP Code: $httpCode): $response\n";
     } elseif ($httpCode == 429) {
         $rateLimited++;
-        echo "Client Error (HTTP Code: $httpCode): " . $response . "\n";
+        echo "Rate Limited (HTTP Code: $httpCode): $response\n";
     } else {
         $failed++;
-        echo "Server Error (HTTP Code: $httpCode): " . $response . "\n";
+        echo "Failed (HTTP Code: $httpCode): $response\n";
     }
-    curl_multi_remove_handle($mh, $ch);
 }
 
 $time = microtime(true) - $start;
 
-echo "\nDone {$requests} requests in {$time} seconds\n";
+echo "\n";
+
+echo "Done {$requests} requests in {$time} seconds\n";
 echo "Average execution time: " . round(($time / $requests), 3) . " seconds\n";
 echo "Successful requests: $success\n";
 echo "Rate limited requests: $rateLimited\n";
 echo "Failed requests: $failed\n\n";
 
-if($failed == 0 && $errors == 0) {
+if ($failed == 0 && $errors == 0) {
     echo "SYSTEM SURVIVED THE STRESS TEST.\n";
 } else {
     echo "SYSTEM EXPERIENCED FAILURES DURING THE STRESS TEST.\n";

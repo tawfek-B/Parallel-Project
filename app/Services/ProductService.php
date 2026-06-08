@@ -10,6 +10,10 @@ class ProductService
 {
     public function getProduct($id)
     {
+        Log::info('CACHE CHECK', [
+            'product_id' => $id
+        ]);
+
         return Cache::remember(
             "product:$id",
             300,
